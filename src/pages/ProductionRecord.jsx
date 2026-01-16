@@ -117,8 +117,7 @@ const ProductionRecord = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`btn w-full text-lg py-4 ${activeTab === 'start' ? 'btn-primary' : 'bg-[#238636] hover:bg-[#2ea043] text-white'
-                            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`btn w-full text-lg py-4 btn-primary ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {loading ? '處理中...' : (activeTab === 'start' ? '紀錄開工' : '紀錄完工')}
                     </button>
