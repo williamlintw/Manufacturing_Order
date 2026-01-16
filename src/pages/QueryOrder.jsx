@@ -155,6 +155,21 @@ const QueryOrder = () => {
         downloadCSV(csvContent, 'details.csv');
     };
 
+    const startTimeRef = React.useRef(null);
+    const finishTimeRef = React.useRef(null);
+
+    const handlePickerOpen = (ref) => {
+        try {
+            if (ref.current && ref.current.showPicker) {
+                ref.current.showPicker();
+            } else {
+                ref.current?.focus();
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <h2 className="text-3xl font-bold mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-500">查詢統計</h2>
@@ -182,7 +197,7 @@ const QueryOrder = () => {
                     </div>
                     <div>
                         <label className="text-xs text-gray-400 mb-1 block">開工時間</label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 relative">
                             <input
                                 className="input-field mb-0 h-12"
                                 placeholder="輸入時間關鍵字"
@@ -191,28 +206,22 @@ const QueryOrder = () => {
                             />
                             <button
                                 type="button"
-                                onClick={() => {
-                                    try {
-                                        document.getElementById('picker-start').showPicker();
-                                    } catch (err) {
-                                        console.error('Picker not supported');
-                                    }
-                                }}
+                                onClick={() => handlePickerOpen(startTimeRef)}
                                 className="btn btn-secondary px-2 h-12 w-12"
                             >
                                 <Calendar size={18} />
                             </button>
                             <input
-                                id="picker-start"
+                                ref={startTimeRef}
                                 type="datetime-local"
-                                style={{ width: 0, height: 0, opacity: 0, position: 'absolute', pointerEvents: 'none' }}
+                                className="opacity-0 absolute bottom-0 left-0 w-full h-full -z-10"
                                 onChange={(e) => setFilters({ ...filters, startTime: e.target.value })}
                             />
                         </div>
                     </div>
                     <div>
                         <label className="text-xs text-gray-400 mb-1 block">完工時間</label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 relative">
                             <input
                                 className="input-field mb-0 h-12"
                                 placeholder="輸入時間關鍵字"
@@ -221,21 +230,15 @@ const QueryOrder = () => {
                             />
                             <button
                                 type="button"
-                                onClick={() => {
-                                    try {
-                                        document.getElementById('picker-finish').showPicker();
-                                    } catch (err) {
-                                        console.error('Picker not supported');
-                                    }
-                                }}
+                                onClick={() => handlePickerOpen(finishTimeRef)}
                                 className="btn btn-secondary px-2 h-12 w-12"
                             >
                                 <Calendar size={18} />
                             </button>
                             <input
-                                id="picker-finish"
+                                ref={finishTimeRef}
                                 type="datetime-local"
-                                style={{ width: 0, height: 0, opacity: 0, position: 'absolute', pointerEvents: 'none' }}
+                                className="opacity-0 absolute bottom-0 left-0 w-full h-full -z-10"
                                 onChange={(e) => setFilters({ ...filters, finishTime: e.target.value })}
                             />
                         </div>
