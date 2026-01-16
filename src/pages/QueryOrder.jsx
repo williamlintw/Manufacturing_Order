@@ -41,9 +41,12 @@ const QueryOrder = () => {
         return `${h}h ${m}m ${s}s`;
     };
 
+    const [hasSearched, setHasSearched] = useState(false);
+
     const handleQuery = async () => {
         setLoading(true);
         setStatus({ type: '', message: '' });
+        setHasSearched(false);
 
         try {
             // 1. Fetch all data
@@ -65,28 +68,34 @@ const QueryOrder = () => {
                 // ID Filter
                 const matchId = !filters.orderId || String(item.orderId).includes(filters.orderId);
 
+                // Date Parsing Helper
+                const getTime = (dateStr) => {
+                    if (!dateStr) return null;
+                    const timestamp = new Date(dateStr).getTime();
+                    return isNaN(timestamp) ? null : timestamp;
+                };
+
+                const filterStart = getTime(filters.startTime);
+                const filterEnd = getTime(filters.finishTime);
+                const itemStart = getTime(item.startTime);
+                const itemEnd = getTime(item.finishTime);
+
                 // Start Time Filter
-                // Note: GAS returns formatted date strings usually or ISO.
-                // If empty input: item.startTime must be present (length > 0)
-                // If has input: item.startTime must include input (simple string match for now)
-                const matchStart = !filters.startTime
-                    ? (item.startTime && item.startTime !== "")
-                    : (String(item.startTime).includes(filters.startTime));
+                // If filter is set, item time must be valid and >= filter time
+                const matchStart = !filters.startTime || (itemStart !== null && itemStart >= filterStart);
 
                 // Finish Time Filter
-                // If empty input: All allowed (so true)
-                // If has input: item.finishTime must include input
-                const matchFinish = !filters.finishTime
-                    ? true
-                    : (String(item.finishTime).includes(filters.finishTime));
+                // If filter is set, item time must be valid and <= filter time
+                const matchEnd = !filters.finishTime || (itemEnd !== null && itemEnd <= filterEnd);
 
-                return matchId && matchStart && matchFinish;
+                return matchId && matchStart && matchEnd;
             });
 
             // Sort by Order ID
             filtered.sort((a, b) => String(a.orderId).localeCompare(String(b.orderId)));
 
             setData(filtered);
+            setHasSearched(true);
 
             // 3. Generate Stats
             // Group by Order ID? Or just list stats for filtered items?
@@ -254,6 +263,13 @@ const QueryOrder = () => {
                 message={status.message}
                 onClose={() => setStatus({ type: '', message: '' })}
             />
+
+            {/* No Data Message */}
+            {!loading && hasSearched && data.length === 0 && (
+                <div className="card p-8 text-center text-gray-400 animate-fade-in border-2 border-dashed border-[#30363d]">
+                    <p className="text-xl">查無資料！</p>
+                </div>
+            )}
 
             {/* Results - Stats */}
             {stats.length > 0 && (
