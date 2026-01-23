@@ -1,3 +1,4 @@
+// ⚠️ 請務必修改此處！將 "YOUR_FOLDER_ID_HERE" 替換為您 Google Drive "MO_Image" 資料夾的 ID
 const IMAGE_FOLDER_ID = "1rBZhbtGoqA6H-dZgdicjZ9PfuhLeQ_4l";
 
 function doGet(e) {
@@ -50,28 +51,37 @@ function getSheet(name) {
 }
 
 // 輔助函式：儲存圖片
+// 輔助函式：儲存圖片
 function saveImage(orderId, base64Data) {
   try {
-    if (!base64Data) return null;
+    if (!base64Data) return { success: true, url: null };
     
-    // Remove header if present (e.g., "data:image/jpeg;base64,")
+    // Default to jpeg
+    let mimeType = MimeType.JPEG;
+    let extension = "jpg";
+
+    // Detect header
+    if (base64Data.includes("data:image/png;")) {
+      mimeType = MimeType.PNG;
+      extension = "png";
+    } else if (base64Data.includes("data:image/jpeg;")) {
+      mimeType = MimeType.JPEG;
+      extension = "jpg";
+    }
+
     const parts = base64Data.split(",");
     const data = parts.length > 1 ? parts[1] : parts[0];
     
-    const blob = Utilities.newBlob(Utilities.base64Decode(data), MimeType.JPEG, orderId + ".jpg");
+    const blob = Utilities.newBlob(Utilities.base64Decode(data), mimeType, orderId + "." + extension);
     const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
     
-    // Check if file exists and delete it (optional, logic says we are issuing new, but if re-issue logic changes)
-    // For now simply create. Note: Drive allows duplicates with same name.
-    // Better to search and delete check might be slow. 
-    // Assuming 'issueOrder' checks for OrderID duplicate in Sheet, so this runs once per OrderID.
-    
+    // Check if file exists and delete it? No, just create new.
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return file.getDownloadUrl();
+    return { success: true, url: file.getDownloadUrl() };
   } catch (e) {
     Logger.log("Save Image Error: " + e.toString());
-    return null;
+    return { success: false, error: e.toString() };
   }
 }
 
@@ -79,15 +89,18 @@ function saveImage(orderId, base64Data) {
 function getImageUrl(orderId) {
   try {
     const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
-    const files = folder.getFilesByName(orderId + ".jpg");
-    if (files.hasNext()) {
-      const file = files.next();
-      // Ensure it's accessible
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      // Use thumbnail link for better performance in UI or Download URL
-      // contentUrl seems to be direct download. 
-      // thumbnailLink is often good for previews.
-        return "https://lh3.googleusercontent.com/d/" + file.getId();
+    // Try common extensions
+    const extensions = ["jpg", "png", "jpeg"];
+    
+    for (let i = 0; i < extensions.length; i++) {
+        const files = folder.getFilesByName(orderId + "." + extensions[i]);
+        if (files.hasNext()) {
+            const file = files.next();
+            // Option 3: Return Base64 Data URI (Most robust, bypasses all cookie/permission/link issues)
+            const blob = file.getBlob();
+            const b64 = Utilities.base64Encode(blob.getBytes());
+            return "data:" + blob.getContentType() + ";base64," + b64;
+        }
     }
     return null;
   } catch (e) {
@@ -115,7 +128,10 @@ function issueOrder(data) {
 
   // Save Image
   if (imageBase64) {
-    saveImage(orderId, imageBase64);
+    const saveResult = saveImage(orderId, imageBase64);
+    if (!saveResult.success) {
+        return errorResponse("圖片儲存失敗：" + saveResult.error);
+    }
   }
 
   const timestamp = new Date();
@@ -286,4 +302,14 @@ function successResponse(msg, data) {
 function errorResponse(msg) {
   return ContentService.createTextOutput(JSON.stringify({ status: "error", message: msg }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// 5. 權限測試 (請在編輯器中選取此函式並點選「執行」以授權 Drive 存取)
+function testDrivePermission() {
+  try {
+    const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
+    Logger.log("權限正常！成功存取資料夾：" + folder.getName());
+  } catch (e) {
+    Logger.log("權限測試失敗：" + e.toString());
+  }
 }

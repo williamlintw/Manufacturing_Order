@@ -268,4 +268,3 @@ const ProductionRecord = () => {
 };
 
 export default ProductionRecord;
-```

@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { Camera, Upload } from 'lucide-react';
-import { Camera, Upload } from 'lucide-react';
 import { api } from '../services/api';
 import QRScanner from '../components/QRScanner';
+import CameraCapture from '../components/CameraCapture';
 import StatusMessage from '../components/StatusMessage';
 
 const IssueOrder = () => {
     const [orderId, setOrderId] = useState('');
     const [status, setStatus] = useState({ type: '', message: '' });
     const [showScanner, setShowScanner] = useState(false);
+    const [showCamera, setShowCamera] = useState(false);
     const [loading, setLoading] = useState(false);
     const [image, setImage] = useState(null);
     const [preview, setPreview] = useState('');
     const fileInputRef = React.useRef(null);
+    // cameraInputRef is no longer needed for the button, but we can keep it if we want a fallback or just remove usage. 
+    // We will remove its usage for the camera button.
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -26,10 +29,8 @@ const IssueOrder = () => {
 
         try {
             let imageBase64 = null;
-            if (image) {
-                // Determine if we need to strip prefix.
-                // The FileReader result includes "data:image/jpeg;base64,".
-                // The backend `saveImage` logic splits by comma, so raw result is fine.
+            if (preview) {
+                // Use preview directly as it contains the base64 string (either from file reader or camera capture)
                 imageBase64 = preview;
             }
 
@@ -54,6 +55,14 @@ const IssueOrder = () => {
         setShowScanner(false);
         // Optional: Auto-submit on scan
         // handleSubmit(); 
+    };
+
+    const handleCapture = (base64Image) => {
+        setPreview(base64Image);
+        // We don't have a File object here, but handleSubmit now uses preview (base64) directly.
+        // If other logic needs 'image' state to be truthy, we can set a dummy or rely on preview.
+        setImage(true); // Set truthy to indicate image presence if needed, though handleSubmit checks preview
+        setShowCamera(false);
     };
 
     const handleImageChange = (e) => {
@@ -98,26 +107,61 @@ const IssueOrder = () => {
 
                     {/* Image Capture Section */}
                     <div className="mb-6">
-                        <label className="text-sm text-gray-400 mb-2 block">料件圖</label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="text-sm text-gray-400">料件圖</label>
+                            {preview && (
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="btn btn-secondary text-xs px-3 py-1 bg-white/10 hover:bg-white/20"
+                                        disabled={loading}
+                                    >
+                                        重新上傳
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCamera(true)}
+                                        className="btn btn-secondary text-xs px-3 py-1 bg-white/10 hover:bg-white/20"
+                                        disabled={loading}
+                                    >
+                                        <Camera size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Hidden Inputs */}
                         <input
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             onChange={handleImageChange}
                             ref={fileInputRef}
-                            className="hidden"
+                            style={{ display: 'none' }} // Force hide
                         />
+                        {/* Camera input removed in favor of custom component */}
 
                         {!preview ? (
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="btn btn-secondary w-full py-3 flex items-center justify-center gap-2 border-dashed border-2 border-gray-600 hover:border-gray-400"
-                                disabled={loading}
-                            >
-                                <Upload size={20} />
-                                拍攝或上傳照片
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="btn btn-secondary flex-1 py-3 flex items-center justify-center gap-2 border-dashed border-2 border-gray-600 hover:border-gray-400"
+                                    disabled={loading}
+                                >
+                                    <Upload size={20} />
+                                    <span>上傳照片</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCamera(true)}
+                                    className="btn btn-secondary w-16 flex items-center justify-center border-dashed border-2 border-gray-600 hover:border-gray-400"
+                                    title="拍攝照片"
+                                    disabled={loading}
+                                >
+                                    <Camera size={24} />
+                                </button>
+                            </div>
                         ) : (
                             <div className="relative">
                                 <img
@@ -125,14 +169,6 @@ const IssueOrder = () => {
                                     alt="Preview"
                                     className="w-full h-48 object-cover rounded-lg border border-gray-600"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="absolute bottom-2 right-2 btn btn-secondary text-xs px-2 py-1 opacity-90"
-                                    disabled={loading}
-                                >
-                                    重新拍攝
-                                </button>
                             </div>
                         )}
                     </div>
@@ -158,6 +194,13 @@ const IssueOrder = () => {
                     onScan={handleScan}
                     onClose={() => setShowScanner(false)}
                     onError={(err) => console.log(err)}
+                />
+            )}
+
+            {showCamera && (
+                <CameraCapture
+                    onCapture={handleCapture}
+                    onClose={() => setShowCamera(false)}
                 />
             )}
         </div>

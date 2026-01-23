@@ -3,36 +3,45 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const QRScanner = ({ onScan, onError, onClose }) => {
     const scannerRef = useRef(null);
-    const [scanError, setScanError] = useState(null);
+    // Use refs to store latest callbacks to avoid re-initializing scanner when they change
+    const onScanRef = useRef(onScan);
+    const onErrorRef = useRef(onError);
 
     useEffect(() => {
-        // Render scanner
+        onScanRef.current = onScan;
+        onErrorRef.current = onError;
+    }, [onScan, onError]);
+
+    useEffect(() => {
+        // Prevent double initialization if already exists
+        if (scannerRef.current) return;
+
         const scanner = new Html5QrcodeScanner(
             "reader",
             { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-        );
-
-        scanner.render(
-            (decodedText) => {
-                onScan(decodedText);
-                scanner.clear(); // Stop scanning after success
-            },
-            (errorMessage) => {
-                // parse error, ignore or log
-                // setScanError(errorMessage);
-                if (onError) onError(errorMessage);
-            }
+            /* verbose= */ false
         );
 
         scannerRef.current = scanner;
 
-        return () => {
-            if (scannerRef.current) {
-                scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
+        scanner.render(
+            (decodedText) => {
+                if (onScanRef.current) onScanRef.current(decodedText);
+            },
+            (errorMessage) => {
+                if (onErrorRef.current) onErrorRef.current(errorMessage);
             }
+        );
+
+        return () => {
+            if (scanner) {
+                scanner.clear().catch(error => {
+                    console.warn("Failed to clear html5-qrcode scanner. ", error);
+                });
+            }
+            scannerRef.current = null;
         };
-    }, [onScan, onError]);
+    }, []);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
@@ -45,7 +54,6 @@ const QRScanner = ({ onScan, onError, onClose }) => {
                 </button>
                 <h3 className="text-lg font-bold mb-4 text-center text-black">掃描 QR Code</h3>
                 <div id="reader" width="100%"></div>
-                {scanError && <p className="text-red-500 text-xs mt-2">{scanError}</p>}
             </div>
         </div>
     );
