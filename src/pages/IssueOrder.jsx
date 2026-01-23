@@ -24,6 +24,11 @@ const IssueOrder = () => {
             return;
         }
 
+        if (!preview) {
+            setStatus({ type: 'error', message: '請上傳料件照片 (必需)' });
+            return;
+        }
+
         setLoading(true);
         setStatus({ type: '', message: '' });
 
