@@ -63,7 +63,7 @@ const callApiGet = async (params) => {
 }
 
 export const api = {
-  issueOrder: (orderId) => callApi({ action: 'issue_order', orderId }),
+  issueOrder: (orderId, image) => callApi({ action: 'issue_order', orderId, image }),
   qcRecord: (orderId) => callApi({ action: 'qc_record', orderId }),
   startWork: (orderId) => callApi({ action: 'start_work', orderId }),
   finishWork: (orderId, quantity) => callApi({ action: 'finish_work', orderId, quantity }),

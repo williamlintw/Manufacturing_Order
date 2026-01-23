@@ -1,3 +1,5 @@
+const IMAGE_FOLDER_ID = "1rBZhbtGoqA6H-dZgdicjZ9PfuhLeQ_4l";
+
 function doGet(e) {
   const action = e.parameter.action;
   
@@ -47,9 +49,58 @@ function getSheet(name) {
   return sheet;
 }
 
+// 輔助函式：儲存圖片
+function saveImage(orderId, base64Data) {
+  try {
+    if (!base64Data) return null;
+    
+    // Remove header if present (e.g., "data:image/jpeg;base64,")
+    const parts = base64Data.split(",");
+    const data = parts.length > 1 ? parts[1] : parts[0];
+    
+    const blob = Utilities.newBlob(Utilities.base64Decode(data), MimeType.JPEG, orderId + ".jpg");
+    const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
+    
+    // Check if file exists and delete it (optional, logic says we are issuing new, but if re-issue logic changes)
+    // For now simply create. Note: Drive allows duplicates with same name.
+    // Better to search and delete check might be slow. 
+    // Assuming 'issueOrder' checks for OrderID duplicate in Sheet, so this runs once per OrderID.
+    
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getDownloadUrl();
+  } catch (e) {
+    Logger.log("Save Image Error: " + e.toString());
+    return null;
+  }
+}
+
+// 輔助函式：取得圖片 URL
+function getImageUrl(orderId) {
+  try {
+    const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
+    const files = folder.getFilesByName(orderId + ".jpg");
+    if (files.hasNext()) {
+      const file = files.next();
+      // Ensure it's accessible
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      // Use thumbnail link for better performance in UI or Download URL
+      // contentUrl seems to be direct download. 
+      // thumbnailLink is often good for previews.
+        return "https://lh3.googleusercontent.com/d/" + file.getId();
+    }
+    return null;
+  } catch (e) {
+    Logger.log("Get Image Error: " + e.toString());
+    return null;
+  }
+}
+
 // 1. 製令發出
 function issueOrder(data) {
   const orderId = data.orderId;
+  const imageBase64 = data.image; // New parameter
+
   if (!orderId) return errorResponse("缺少製令編號");
 
   const sheet = getSheet("製令前準備紀錄");
@@ -60,6 +111,11 @@ function issueOrder(data) {
     if (String(rows[i][0]) === String(orderId)) {
       return errorResponse("此製令已存在！");
     }
+  }
+
+  // Save Image
+  if (imageBase64) {
+    saveImage(orderId, imageBase64);
   }
 
   const timestamp = new Date();
@@ -75,10 +131,12 @@ function qcRecord(data) {
   const sheet = getSheet("製令前準備紀錄");
   const rows = sheet.getDataRange().getValues();
   let rowIndex = -1;
+  let issueTime = "";
 
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(orderId)) {
       rowIndex = i + 1; // 1-based index
+      issueTime = rows[i][1]; // Column B
       // 檢查是否已有 QC 時間 (Column C is index 2)
       if (rows[i][2] !== "") {
         return errorResponse("此製令首件檢驗時間已存在！如有問題，請聯絡開發人員確認。");
@@ -93,7 +151,15 @@ function qcRecord(data) {
 
   const timestamp = new Date();
   sheet.getRange(rowIndex, 3).setValue(timestamp);
-  return successResponse("首件檢驗時間紀錄成功！");
+  
+  const imageUrl = getImageUrl(orderId);
+  
+  return successResponse("首件檢驗時間紀錄成功！", {
+    orderId: orderId,
+    issueTime: issueTime,
+    qcTime: timestamp,
+    imageUrl: imageUrl
+  });
 }
 
 // 3.1 製令開工
@@ -138,13 +204,20 @@ function startWork(data) {
   const timestamp = new Date();
   const id = Utilities.getUuid();
   dataSheet.appendRow([id, orderId, timestamp, "", ""]);
-  return successResponse("製令開工紀錄成功！");
+  
+  const imageUrl = getImageUrl(orderId);
+
+  return successResponse("製令開工紀錄成功！", {
+    orderId: orderId,
+    startTime: timestamp,
+    imageUrl: imageUrl
+  });
 }
 
 // 3.2 製令完工
 function finishWork(data) {
   const orderId = data.orderId;
-  const quantity = data.quantity; // Note: 0 is allowed positive integer? usually positive means >0, but requirement says "0以上的正整數" (>=0 integer)
+  const quantity = data.quantity; 
   
   if (!orderId) return errorResponse("缺少製令編號");
   if (quantity === undefined || quantity === null || quantity < 0 || !Number.isInteger(Number(quantity))) {
@@ -154,11 +227,13 @@ function finishWork(data) {
   const sheet = getSheet("製令資料");
   const rows = sheet.getDataRange().getValues();
   let rowIndex = -1;
+  let startTime = "";
 
   // 找沒有完工時間的
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][1]) === String(orderId) && rows[i][3] === "") {
       rowIndex = i + 1;
+      startTime = rows[i][2];
       break;
     }
   }
@@ -170,22 +245,22 @@ function finishWork(data) {
   const timestamp = new Date();
   sheet.getRange(rowIndex, 4).setValue(timestamp); // Finish Time
   sheet.getRange(rowIndex, 5).setValue(quantity);  // Quantity
-  return successResponse("製令完工紀錄成功！");
+  
+  const imageUrl = getImageUrl(orderId);
+
+  return successResponse("製令完工紀錄成功！", {
+    orderId: orderId,
+    startTime: startTime,
+    finishTime: timestamp,
+    quantity: quantity,
+    imageUrl: imageUrl
+  });
 }
 
 // 4. 通用查詢
 function queryOrders(e) {
-  // 這裡回傳全部或篩選後的資料，前端再做統計
-  // 為了簡化，回傳所有資料，前端處理篩選邏輯會比較靈活 (除非資料量真的很大)
-  // 根據需求提到的篩選：
-  // 1. Order ID
-  // 2. Start Time exists (implied > 0)
-  // 3. Finish Time (exists or not)
-  
-  // 為了效能，我們讀取 '製令資料' 全部
   const dataSheet = getSheet("製令資料");
   const rawData = dataSheet.getDataRange().getValues();
-  const header = rawData[0];
   const rows = rawData.slice(1);
 
   // 轉換成 JSON Array
