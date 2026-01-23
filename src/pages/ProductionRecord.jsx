@@ -94,7 +94,7 @@ const ProductionRecord = () => {
 
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <h2 className="text-3xl font-bold mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">生產紀錄</h2>
+            <h2 className="text-3xl font-bold mb-8 text-center" style={{ color: '#fb923c' }}>生產紀錄</h2>
 
             {/* Tabs */}
             <div className="flex mb-6 bg-[#21262d] p-1 rounded-lg border border-[#30363d] gap-4">

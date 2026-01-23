@@ -54,7 +54,7 @@ const QCRecord = () => {
 
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <h2 className="text-3xl font-bold mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">首件檢驗</h2>
+            <h2 className="text-3xl font-bold mb-8 text-center" style={{ color: '#34d399' }}>首件檢驗</h2>
 
             <div className="card w-full mb-6 p-6">
                 <form onSubmit={handleSubmit}>
