@@ -52,9 +52,10 @@ function getSheet(name) {
 
 // 輔助函式：儲存圖片
 // 輔助函式：儲存圖片
+// 輔助函式：儲存圖片
 function saveImage(orderId, base64Data) {
   try {
-    if (!base64Data) return { success: true, url: null };
+    if (!base64Data) return { success: false, error: "Backend received empty image data" };
     
     // Default to jpeg
     let mimeType = MimeType.JPEG;
@@ -75,10 +76,15 @@ function saveImage(orderId, base64Data) {
     const blob = Utilities.newBlob(Utilities.base64Decode(data), mimeType, orderId + "." + extension);
     const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
     
-    // Check if file exists and delete it? No, just create new.
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return { success: true, url: file.getDownloadUrl() };
+    
+    // Debug info
+    return { 
+        success: true, 
+        url: file.getDownloadUrl(), 
+        debug: `Saved to ${folder.getName()} as ${file.getName()}` 
+    };
   } catch (e) {
     Logger.log("Save Image Error: " + e.toString());
     return { success: false, error: e.toString() };
@@ -127,16 +133,21 @@ function issueOrder(data) {
   }
 
   // Save Image
+  let debugMsg = "No Image Processed";
   if (imageBase64) {
     const saveResult = saveImage(orderId, imageBase64);
     if (!saveResult.success) {
         return errorResponse("圖片儲存失敗：" + saveResult.error);
     }
+    debugMsg = saveResult.debug || "Saved";
+  } else {
+    return errorResponse("後端未接收到圖片資料！請確認網路狀況或重新上傳。");
   }
 
   const timestamp = new Date();
   sheet.appendRow([orderId, timestamp, ""]);
-  return successResponse("製令發出成功！");
+  // Include debug message in success response
+  return successResponse(`製令發出成功！(${debugMsg})`);
 }
 
 // 2. 製令品檢
